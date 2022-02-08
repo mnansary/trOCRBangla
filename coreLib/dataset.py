@@ -36,6 +36,7 @@ class DataSet(object):
 
         
         self.fonts       =   [fpath for fpath in glob(os.path.join(data_dir,language,"fonts","*.ttf"))]
+        self.def_font    =   os.path.join(data_dir,language,f"{language}.ttf")
         if not use_printed_only:
             # assign
             self.graphemes          = graphemes
