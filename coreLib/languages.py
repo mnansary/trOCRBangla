@@ -228,8 +228,11 @@ languages["bangla"]=bangla
 languages["english"]=english
 
 class vocab:
-    unicodes  =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.unicodes)))
-    components=["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.components)))
-    graphemes =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.graphemes)))
+    class unicodes:
+        all  =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.unicodes)))
+    class components:
+        all =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.components)))
+    class graphemes: 
+        all =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.graphemes)))
 
 
