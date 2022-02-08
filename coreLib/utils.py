@@ -3,6 +3,7 @@
 @author:MD.Nazmuddoha Ansary
 """
 from __future__ import print_function
+from cv2 import imshow
 #---------------------------------------------------------------
 # imports
 #---------------------------------------------------------------
@@ -12,7 +13,8 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 import random
-from wand.image import Image as WImage
+from PIL import Image
+import math
 #---------------------------------------------------------------
 def LOG_INFO(msg,mcolor='blue'):
     '''
@@ -106,7 +108,7 @@ def warp_data(img):
     return img
 
 
-def rotate_image(mat, angle_max=15):
+def rotate_image(mat, angle_max=5):
     """
         Rotates an image (angle in degrees) and expands image to avoid cropping
     """
@@ -283,6 +285,7 @@ class GraphemeParser(object):
 
                 r_decomp.append(sorted(list(first)))
                 comps = rest
+            
             # add    
             combs=[]
             for ridx in r_decomp:
@@ -291,20 +294,13 @@ class GraphemeParser(object):
                     comb+=decomp[i]
                 combs.append(comb)
                 for i in ridx:
-                    decomp[i]=comb
-                    
-            # new root based decomp
-            new_decomp=[]
-            for i in range(len(decomp)-1):
-                if decomp[i] not in combs:
-                    new_decomp.append(decomp[i])
-                else:
-                    if decomp[i]!=decomp[i+1]:
-                        new_decomp.append(decomp[i])
-
-            new_decomp.append(decomp[-1])#+add*connector
+                    if i==ridx[-1]:
+                        decomp[i]=comb
+                    else:
+                        decomp[i]=None
+            decomp=[d for d in decomp if d is not None]
             
-            return new_decomp
+            return decomp
         else:
             return decomp
 
@@ -326,7 +322,7 @@ class GraphemeParser(object):
             graphemes.append(grapheme)
         return graphemes
 
-    def process(self,word,return_graphemes=False):
+    def process(self,word,return_graphemes=True,debug=False):
         '''
             processes a word for creating:
             if return_graphemes=False (default):
@@ -337,6 +333,8 @@ class GraphemeParser(object):
         try:
             decomp=[ch for ch in word]
             decomp=self.get_root_from_decomp(decomp)
+            if debug:
+                print(decomp)        
             if return_graphemes:
                 return self.get_graphemes_from_decomp(decomp)
             else:
@@ -355,32 +353,69 @@ class GraphemeParser(object):
                             components.append(cd_val)
                 return components
         except Exception as e:
-            LOG_INFO(e)
-            LOG_INFO(word)                        
+            if debug:
+                print(e)
+                print(word)                        
 
 #----------------------------------------
 # noise utils
 #----------------------------------------
+def gaussian_noise(height, width):
+    """
+        Create a background with Gaussian noise (to mimic paper)
+    """
+
+    # We create an all white image
+    image = np.ones((height, width)) * 255
+
+    # We add gaussian noise
+    cv2.randn(image, 235, 10)
+
+    return np.array(Image.fromarray(image).convert("RGB"))
+
+def quasicrystal(height, width):
+    """
+        Create a background with quasicrystal (https://en.wikipedia.org/wiki/Quasicrystal)
+    """
+
+    image = Image.new("L", (width, height))
+    pixels = image.load()
+
+    frequency = random.random() * 30 + 20  # frequency
+    phase = random.random() * 2 * math.pi  # phase
+    rotation_count = random.randint(10, 20)  # of rotations
+
+    for kw in range(width):
+        y = float(kw) / (width - 1) * 4 * math.pi - 2 * math.pi
+        for kh in range(height):
+            x = float(kh) / (height - 1) * 4 * math.pi - 2 * math.pi
+            z = 0.0
+            for i in range(rotation_count):
+                r = math.hypot(x, y)
+                a = math.atan2(y, x) + i * math.pi * 2.0 / rotation_count
+                z += math.cos(r * math.sin(a) * frequency + phase)
+            c = int(255 - round(255 * z / rotation_count))
+            pixels[kw, kh] = c  # grayscale
+    return np.array(image.convert("RGB"))
+
+
 class Modifier:
     def __init__(self,
-                blur_kernel_size_max=6,
-                blur_kernel_size_min=3,
                 bi_filter_dim_min=7,
                 bi_filter_dim_max=12,
                 bi_filter_sigma_max=80,
                 bi_filter_sigma_min=70,
-                use_gaussblur=True,
-                use_brightness=True,
-                use_bifilter=True,
-                use_gaussnoise=True,
-                use_medianblur=True):
+                use_gaussblur=False,
+                use_bifilter=False,
+                use_medianblur=True,
+                use_gaussnoise=False,
+                use_brightness=False):
 
-        self.blur_kernel_size_max   =   blur_kernel_size_max
-        self.blur_kernel_size_min   =   blur_kernel_size_min
         self.bi_filter_dim_min      =   bi_filter_dim_min
         self.bi_filter_dim_max      =   bi_filter_dim_max
         self.bi_filter_sigma_min    =   bi_filter_sigma_min
         self.bi_filter_sigma_max    =   bi_filter_sigma_max
+        
         self.use_brightness         =   use_brightness
         self.use_bifilter           =   use_bifilter
         self.use_gaussnoise         =   use_gaussnoise
@@ -388,9 +423,7 @@ class Modifier:
         self.use_medianblur         =   use_medianblur
         
     def __initParams(self):
-        self.blur_kernel_size=random.randrange(self.blur_kernel_size_min,
-                                               self.blur_kernel_size_max, 
-                                               2)
+        self.blur_kernel_size=3
         self.bi_filter_dim   =random.randrange(self.bi_filter_dim_min,
                                                self.bi_filter_dim_max, 
                                                2)
@@ -459,3 +492,17 @@ class Modifier:
         idx = random.choice(range(len(self.ops)))
         img = self.ops.pop(idx)(img)
         return img
+#---------------------wrapper
+def paper_noise(img):
+    if random_exec(weights=[0.8,0.2]):
+        h,w=img.shape
+        back_fn=random.choice([quasicrystal,gaussian_noise])
+        back=back_fn(h,w)
+        r=random.randint(0,25)
+        g=random.randint(0,25)
+        b=random.randint(0,25)
+        back[img==0]=(r,g,b)
+        img=np.copy(back)
+    else:
+        img=cv2.merge((img,img,img))
+    return img
