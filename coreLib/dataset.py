@@ -53,7 +53,7 @@ class DataSet(object):
             self.numbers_list  = sorted(list(self.numbers.df.label.unique()))
             # combined data
             self.valid_graphemes=sorted(self.graphemes_list+self.numbers_list)
-            self.df             =pd.concat([self.graphemes.df,self.numbers.df],ignore_index=False)
+            self.df             =pd.concat([self.graphemes.df,self.numbers.df],ignore_index=True)
 
     def __checkExistance(self):
         '''
