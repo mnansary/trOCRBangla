@@ -2,8 +2,8 @@
 # Transformer based grapheme OCR
 
 ```python
-Version: 0.0.1
-Authors: Md. Nazmuddoha Ansary,
+Version: 0.0.2
+Authors: Md. Nazmuddoha Ansary
 ```
 
 **LOCAL ENVIRONMENT**  
@@ -35,5 +35,5 @@ Gnome       : 3.36.8
 * **conda**: use environment.yml: ```conda env create -f environment.yml```
 
 # TODO
-- [ ] camera mode noise induction
-- [ ] config based datagen
+- [ ] synthetic storing: store.py
+- [ ] datagen.py and processing.py for natural datasets

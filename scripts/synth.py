@@ -19,7 +19,8 @@ from ast import literal_eval
 
 from coreLib.utils import *
 from coreLib.synthetic import createSyntheticData
-from coreLib.languages import languages
+from coreLib.languages import languages,vocab
+from coreLib.processing import processLabels
 tqdm.pandas()
 #--------------------
 # main
@@ -31,6 +32,9 @@ def main(args):
     data_type   =   args.data_type
     use_scene   =   args.scene
     exclude_punct=  args.exclude_punct
+    img_height  =   int(args.img_height)
+    img_width   =   int(args.img_width)
+    
     assert os.path.exists(os.path.join(data_dir,language)),"the specified language does not contain a valid graphems,numbers and fonts data"
     assert data_type in ["printed","handwritten"],"must be in ['printed','handwritten']"
     
@@ -38,20 +42,38 @@ def main(args):
     pad_height  =   int(args.pad_height)
     num_samples =   int(args.num_samples)
     iden        =   args.iden
-    
+
+    # vocab lens
+    glen        =   int(args.max_glen)
+    clen        =   int(args.max_clen)
+    ulen        =   int(args.max_ulen)
+
+    img_dim=(img_height,img_width)
+
     if iden is None:
         iden=f"{language}_{data_type}"
     language=languages[language]
     # data creation
-    csv=createSyntheticData(iden=iden,
+    df,csv=createSyntheticData(iden=iden,
                             save_dir=save_path,
                             data_dir=data_dir,
                             language=language,
+                            img_dim=img_dim,
                             data_type=data_type,
                             num_samples=num_samples,
                             pad_height=pad_height,
                             create_scene_data=use_scene,
                             exclude_punct=exclude_punct)
+    # label processing
+    vocab.unicodes.mlen=ulen
+    vocab.components.mlen=clen
+    vocab.graphemes.mlen=glen
+    df=processLabels(df,vocab)
+    df.to_csv(csv,index=False)
+
+    
+
+    
 #-----------------------------------------------------------------------------------
 
 if __name__=="__main__":
@@ -68,6 +90,12 @@ if __name__=="__main__":
     parser.add_argument("--num_samples",required=False,default=100000,help ="number of samples to create when:default=100000")
     parser.add_argument("--scene",required=False,type=str2bool,default=True,help ="wheather to use scene data:default=True")
     parser.add_argument("--exclude_punct",required=False,type=str2bool,default=False,help ="wheather to avoid punctuations :default=False")
+    parser.add_argument("--img_height",required=False,default=64,help ="height for each grapheme: default=64")
+    parser.add_argument("--img_width",required=False,default=512,help ="width for each grapheme: default=512")
+    parser.add_argument("--max_glen",required=False,default=40,help=" the maximum length of grapheme data for modeling")
+    parser.add_argument("--max_clen",required=False,default=90,help=" the maximum length of components data for modeling")
+    parser.add_argument("--max_ulen",required=False,default=120,help=" the maximum length of unicode data for modeling")
+    
     
     args = parser.parse_args()
     main(args)

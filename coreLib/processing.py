@@ -15,7 +15,26 @@ tqdm.pandas()
 #--------------------
 # helpers
 #--------------------
+#--------------------
+# helpers
+#--------------------
 not_found=[]
+
+def reset(df):
+    # sort df
+    df.dropna(inplace=True)
+    df.reset_index(drop=True,inplace=True) 
+    return df
+
+def cvt_str(x):
+    try:
+        x=str(x)
+        x=x.strip()
+        x=x.replace(" ","")
+        return x
+    except Exception as e:
+        return None
+
 
 def encode_label(x,vocab,max_len):
     '''
@@ -125,89 +144,97 @@ def correctPadding(img,dim,ptype="central",pvalue=255):
     img=cv2.resize(img,(img_width,img_height),fx=0,fy=0, interpolation = cv2.INTER_NEAREST)
     return img,mask 
 #---------------------------------------------------------------
-def processImages(df,save_dir,img_dim,ptype="left"):
-    '''
-        process a specific dataframe with filename,word,graphemes and mode
-        args:
-            df      :   the dataframe to process
-            save_dir:   path to save temp data
-            img_dim :   tuple of (img_height,img_width)  
-            ptype   :   type of padding to use
-    '''
-    datapaths=[]
-    img_dir=os.path.join(save_dir,"image")
-    mask_dir=os.path.join(save_dir,"mask")
-
-    for idx in tqdm(range(len(df))):
-        try:
-            # mask
-            mask=np.zeros(img_dim)
-            # path
-            img_path    =   df.iloc[idx,0]
-            # filename
-            file_name   =   os.path.basename(img_path)
-            # read image
-            img=cv2.imread(img_path)
-            # correct padding
-            img,imask=correctPadding(img,img_dim,ptype=ptype)
-            # mask
-            mask[:,imask:]=1
-            datapath=os.path.join(img_dir,file_name)
-            cv2.imwrite(datapath,img)
-            cv2.imwrite(os.path.join(mask_dir,file_name),mask)
-            datapaths.append(datapath)
-            
-        except Exception as e:
-            datapaths.append(None)
-            LOG_INFO(e)
-    df["datapath"]=datapaths
-    return df
-#---------------------------------------------------------------
-def processLabels(df,vocab,max_len):
+def processLabels(df,vocab):
     '''
         processLabels:
-        * divides: word to - unicodes,components
-        e-->encoded
-        p-->paded
-        u-->unicode
-        g-->grapheme components
-        r-->raw with out start end
+        * divides: word to - unicodes,components,graphemes
     '''
     GP=GraphemeParser(language=None)
     # process text
+    df.word=df.word.progress_apply(lambda x:cvt_str(x))
+    df=reset(df)
+    # unicodes
+    df["u"]=df.word.progress_apply(lambda x:[i for i in x])
+    df=reset(df)
+    df["ulabel"]=df["u"].progress_apply(lambda x:encode_label(x,vocab.unicodes.all,vocab.unicodes.mlen))
+    df=reset(df)
     
-    ## components
-    df.word=df.word.progress_apply(lambda x:str(x))
-    df["components"]=df.word.progress_apply(lambda x:GP.process(x))
-    df.dropna(inplace=True)
-    df.reset_index(drop=True,inplace=True)
-    df["label"]=df.components.progress_apply(lambda x:encode_label(x,vocab,max_len))
+    # components
+    df["c"]=df.word.progress_apply(lambda x:GP.process(x,return_graphemes=False))
+    df=reset(df)
+    df["clabel"]=df["c"].progress_apply(lambda x:encode_label(x,vocab.components.all,vocab.components.mlen))
+    df=reset(df)
+    
+    # graphemes
+    df["g"]=df.word.progress_apply(lambda x:GP.process(x,return_graphemes=True))
+    df=reset(df)
+    df["glabel"]=df["g"].progress_apply(lambda x:encode_label(x,vocab.graphemes.all,vocab.graphemes.mlen))
+    df=reset(df)
     return df 
 
-#------------------------------------------------
-def processData(data_dir,vocab,img_dim,max_len):
-    '''
-        processes the dataset
-        args:
-            data_dir    :   the directory that holds data.csv and images folder
-            vocab       :   language class
-            img_dim     :   tuple of (img_height,img_width) 
-            max_len     :   model max_len
-    '''
-    csv=os.path.join(data_dir,"data.csv")
-    save_dir=os.path.join(data_dir,"temp")
-    # processing
-    df=pd.read_csv(csv)
-    df.reset_index(drop=True,inplace=True)
-    # images
-    df=processImages(df,save_dir,img_dim)
-    # labels
-    df=processLabels(df,vocab,max_len)
-    # save data
-    cols=["filepath","word","datapath","label"]
-    df=df[cols]
-    df.dropna(inplace=True)
-    df.reset_index(drop=True,inplace=True)
-    df.to_csv(csv,index=False)
-    LOG_INFO(f"Not Found:{not_found}")
-    return df
+# #---------------------------------------------------------------
+# def processImages(df,save_dir,img_dim,ptype="left"):
+#     '''
+#         process a specific dataframe with filename,word,graphemes and mode
+#         args:
+#             df      :   the dataframe to process
+#             save_dir:   path to save temp data
+#             img_dim :   tuple of (img_height,img_width)  
+#             ptype   :   type of padding to use
+#     '''
+#     datapaths=[]
+#     img_dir=os.path.join(save_dir,"image")
+#     mask_dir=os.path.join(save_dir,"mask")
+
+#     for idx in tqdm(range(len(df))):
+#         try:
+#             # mask
+#             mask=np.zeros(img_dim)
+#             # path
+#             img_path    =   df.iloc[idx,0]
+#             # filename
+#             file_name   =   os.path.basename(img_path)
+#             # read image
+#             img=cv2.imread(img_path)
+#             # correct padding
+#             img,imask=correctPadding(img,img_dim,ptype=ptype)
+#             # mask
+#             mask[:,imask:]=1
+#             datapath=os.path.join(img_dir,file_name)
+#             cv2.imwrite(datapath,img)
+#             cv2.imwrite(os.path.join(mask_dir,file_name),mask)
+#             datapaths.append(datapath)
+            
+#         except Exception as e:
+#             datapaths.append(None)
+#             LOG_INFO(e)
+#     df["datapath"]=datapaths
+#     return df
+
+# #------------------------------------------------
+# def processData(data_dir,vocab,img_dim,max_len):
+#     '''
+#         processes the dataset
+#         args:
+#             data_dir    :   the directory that holds data.csv and images folder
+#             vocab       :   language class
+#             img_dim     :   tuple of (img_height,img_width) 
+#             max_len     :   model max_len
+#     '''
+#     csv=os.path.join(data_dir,"data.csv")
+#     save_dir=os.path.join(data_dir,"temp")
+#     # processing
+#     df=pd.read_csv(csv)
+#     df.reset_index(drop=True,inplace=True)
+#     # images
+#     df=processImages(df,save_dir,img_dim)
+#     # labels
+#     df=processLabels(df,vocab,max_len)
+#     # save data
+#     cols=["filepath","word","datapath","label"]
+#     df=df[cols]
+#     df.dropna(inplace=True)
+#     df.reset_index(drop=True,inplace=True)
+#     df.to_csv(csv,index=False)
+#     LOG_INFO(f"Not Found:{not_found}")
+#     return df

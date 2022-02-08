@@ -5,7 +5,7 @@
 #--------------------
 # imports
 #--------------------
-import os 
+import os
 import cv2
 import numpy as np
 import random
@@ -18,7 +18,8 @@ import PIL
 import PIL.Image , PIL.ImageDraw , PIL.ImageFont 
 tqdm.pandas()
 import matplotlib.pyplot as plt
-
+import math
+from .processing import correctPadding
 noise=Modifier()
 #--------------------
 # helpers
@@ -40,13 +41,11 @@ def createImgFromComps(df,comps,pad):
     '''
     # get img_paths
     img_paths=[]
-    for comp in comps:
+    for idx,comp in enumerate(comps):
         cdf=df.loc[df.label==comp]
         cdf=cdf.sample(frac=1)
-        if len(cdf)==1:
-            img_paths.append(cdf.iloc[0,2])
-        else:
-            img_paths.append(cdf.iloc[random.randint(0,len(cdf)-1),2])
+        cdf.reset_index(drop=True,inplace=True)
+        img_paths.append(cdf.iloc[0,2])
     
     # get images
     imgs=[cv2.imread(img_path,0) for img_path in img_paths]
@@ -104,7 +103,7 @@ def createImgFromComps(df,comps,pad):
         cimgs.append(img)
 
     img=np.concatenate(cimgs,axis=1)
-    return img 
+    return img
 
 
 def createFontImageFromComps(font,comps):
@@ -128,7 +127,7 @@ def createFontImageFromComps(font,comps):
     img=img[y_min:y_max,x_min:x_max]
     return img    
     
-def createRandomDictionary(valid_graphemes,num_samples):
+def createRandomDictionary(valid_graphemes,num_samples,include_space=True):
     '''
         creates a randomized dictionary
         args:
@@ -144,7 +143,17 @@ def createRandomDictionary(valid_graphemes,num_samples):
     for _ in tqdm(range(num_samples)):
         len_word=random.choices(population=[1,2,3,4,5,6,7,8,9,10],weights=[0.05,0.05,0.1,0.15,0.15,0.15,0.15,0.1,0.05,0.05],k=1)[0]
         _graphemes=[]
+        _space_added=False
         for _ in range(len_word):
+            if include_space:
+                # space
+                if random_exec(weights=[0.8,0.2],match=1) and not _space_added:
+                    num_space=random.randint(0,3)
+                    if num_space>0:
+                        for _ in range(num_space):
+                            _graphemes.append(" ")
+                    _space_added=True
+            # grapheme
             _graphemes.append(random.choice(valid_graphemes))
         graphemes.append(_graphemes)
         word.append("".join(_graphemes))
@@ -161,6 +170,7 @@ def createSyntheticData(iden,
                         data_type,    
                         data_dir,
                         language,
+                        img_dim,
                         num_samples=100000,
                         comp_dim=64,
                         pad_height=20,
@@ -168,23 +178,14 @@ def createSyntheticData(iden,
                         use_only_numbers=False,
                         use_all=True,
                         fname_offset=0,
-                        return_df=False,
                         create_scene_data=True,
-                        exclude_punct=False):
+                        exclude_punct=False,
+                        include_space=False):
     '''
         creates: 
             * handwriten word image
             * fontspace word image
             * a dataframe/csv that holds word level groundtruth
-        args:
-            iden            :       identifier of the dataset
-            img_height      :       height of the image
-            save_dir        :       the directory to save the outputs
-            data_type       :       the data_type to create (handwritten/printed)
-            data_dir        :       the directory that holds graphemes and numbers and fonts data
-            language        :       the specific language to use
-            num_samples     :       number of data to be created 
-            
     '''
     #---------------
     # processing
@@ -193,22 +194,29 @@ def createSyntheticData(iden,
     LOG_INFO(save_dir)
     # save_paths
     class save:    
-        img=create_dir(save_dir,"images")
+        img  =create_dir(save_dir,"images")
+        amask=create_dir(save_dir,"attention_masks")
+        imask=create_dir(save_dir,"image_masks")
+        std  =create_dir(save_dir,"standards")
         csv=os.path.join(save_dir,"data.csv")
+        txt=os.path.join(save_dir,"data.txt")
+    
     
     # dataset
     if data_type=="printed":
         ds=DataSet(data_dir,language.iden,use_printed_only=True)
         pad=None
         if use_all:
-            valid_graphemes=language.valid
+            valid_graphemes=language.graphemes
         elif use_only_graphemes:
             valid_graphemes=language.dict_graphemes
         elif use_only_numbers:
             valid_graphemes=language.numbers
         if exclude_punct:
             valid_graphemes=[grapheme for grapheme in valid_graphemes if grapheme not in language.punctuations]
+        include_space=include_space
     else:
+        include_space=False
         ds=DataSet(data_dir,language.iden)
         if use_all:
             valid_graphemes=ds.valid_graphemes
@@ -226,37 +234,64 @@ def createSyntheticData(iden,
             height          =pad_height   
 
     # save data
-    dictionary=createRandomDictionary(valid_graphemes,num_samples)
+    dictionary=createRandomDictionary(valid_graphemes,num_samples,include_space=include_space)
     # dataframe vars
     filepaths=[]
     words=[]
     fiden=0+fname_offset
+    def_font=PIL.ImageFont.truetype(ds.def_font,comp_dim)
     # loop
     for idx in tqdm(range(len(dictionary))):
         try:
             comps=dictionary.iloc[idx,1]
             if data_type=="printed":
-                fsize=random.randint(8,256)
+                fsize=random.randint(12,256)
                 font=PIL.ImageFont.truetype(random.choice(ds.fonts),fsize)
+                
+                # image
                 img=createFontImageFromComps(font,comps) 
                 img=post_process_word_image(img)
                 img=np.squeeze(img)
+                # std
+                std=createFontImageFromComps(def_font,comps) 
+                
+                
                 if create_scene_data:
-                    back=cv2.imread(random.choice(ds.backs))
-                    back=cv2.resize(back,(int(20*fsize),int(20*fsize)))
-                    hb,wb,_=back.shape
+                    # extend image
+                    if random_exec(match=1):
+                        hi,wi=img.shape
+                        ptype=random.choice(["tb","lr",None])
+                        pdim=math.ceil(0.01*wi*random.randint(1,10))
+                        img=padAllAround(img,pdim,0,pad_single=ptype)
+                        
                     hi,wi=img.shape
+                    back=cv2.imread(random.choice(ds.backs))
+                    back=cv2.resize(back,(int(20*wi),int(20*hi)))
+                    hb,wb,_=back.shape
                     x=random.randint(0,wb-wi)
                     y=random.randint(0,hb-hi)
                     back=back[y:y+hi,x:x+wi]
                     back[img==255]=randColor()
+                    # imask
+                    imask=np.copy(img)
+                    imask[imask>0]=255 
+                    # img
                     img=np.copy(back)
+                    
                 else:
-                    img=255-img   
-                    img=cv2.merge((img,img,img))
-                    img=noise.noise(img)
+                    # imask
+                    imask=np.copy(img)
+                    imask[imask>0]=255 
+                    # img  
+                    img=255-img
+                    img=paper_noise(img) 
+                    
+                
             else:
-                img_height=random.randint(8,128)
+                # std
+                std=createFontImageFromComps(def_font,comps) 
+                
+                img_height=random.randint(12,128)
                 # image
                 img=createImgFromComps(df=ds.df,comps=comps,pad=pad)
                 img=255-img
@@ -265,21 +300,48 @@ def createSyntheticData(iden,
                 img=cv2.resize(img,(w_new,img_height))
                 img=post_process_word_image(img)
                 img=np.squeeze(img)
-                img=255-img
-                img=cv2.merge((img,img,img))
-                img=noise.noise(img)
+                # imask
+                imask=np.copy(img)
+                imask[imask>0]=255 
                 
+                # img
+                img=255-img
+                img=paper_noise(img)
+
+            
             # save
             fname=f"{fiden}.png"
+            # img
+            img,mval=correctPadding(img,img_dim,ptype="left")
+            img=noise.noise(img)
             cv2.imwrite(os.path.join(save.img,fname),img)
+            
+            # std
+            std=cv2.merge((std,std,std))
+            std,_=correctPadding(std,img_dim,ptype="left")
+            cv2.imwrite(os.path.join(save.std,fname),std)
+            
+            # imask
+            imask=cv2.merge((imask,imask,imask))
+            imask,_=correctPadding(imask,img_dim,ptype="left")
+            cv2.imwrite(os.path.join(save.imask,fname),imask)
+
+            # amask
+            h,w,d=img.shape
+            amask=np.zeros((h,w))
+            amask[:,mval:]=255
+            cv2.imwrite(os.path.join(save.amask,fname),amask)
+            
+
             filepaths.append(os.path.join(save.img,fname))
-            words.append("".join(comps))
+            word="".join(comps)
+            words.append(word)
             fiden+=1
+            with open(save.txt,"a+") as f:
+                f.write(f"{fiden}.png#,#{word}#\n")
         except Exception as e:
            LOG_INFO(e)
+    
     df=pd.DataFrame({"filepath":filepaths,"word":words})
-    if return_df:
-        return df,save.csv
-    else:
-        df.to_csv(os.path.join(save.csv),index=False)
-        return save.csv
+    df.to_csv(os.path.join(save.csv),index=False)
+    return df,save.csv

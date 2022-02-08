@@ -19,7 +19,8 @@ class english:
                                 '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`',
                                 '{', '|', '}', '~']
     numbers                =    ["0","1","2","3","4","5","6","7","8","9"]
-    unicodes               =    sorted(lower+upper+numbers+punctuations) 
+    graphemes              =    sorted(lower+upper+numbers+punctuations) 
+    dict_graphemes         =    lower+upper
     
 class bangla:
     iden                   =    "bangla"
@@ -229,10 +230,10 @@ languages["english"]=english
 
 class vocab:
     class unicodes:
-        all  =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.unicodes)))
+        all  =["pad","start","end","sep"]+sorted(list(set(english.graphemes+bangla.unicodes)))
     class components:
-        all =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.components)))
+        all =["pad","start","end","sep"]+sorted(list(set(english.graphemes+bangla.components)))
     class graphemes: 
-        all =["pad","start","end","sep"]+sorted(list(set(english.unicodes+bangla.graphemes)))
+        all =["pad","start","end","sep"]+sorted(list(set(english.graphemes+bangla.graphemes)))
 
 
