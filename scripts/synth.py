@@ -45,7 +45,6 @@ def main(args):
 
     # vocab lens
     glen        =   int(args.max_glen)
-    clen        =   int(args.max_clen)
     ulen        =   int(args.max_ulen)
 
     img_dim=(img_height,img_width)
@@ -66,7 +65,6 @@ def main(args):
                             exclude_punct=exclude_punct)
     # label processing
     vocab.unicodes.mlen=ulen
-    vocab.components.mlen=clen
     vocab.graphemes.mlen=glen
     df=processLabels(df,vocab)
     df.to_csv(csv,index=False)
@@ -92,9 +90,8 @@ if __name__=="__main__":
     parser.add_argument("--exclude_punct",required=False,type=str2bool,default=False,help ="wheather to avoid punctuations :default=False")
     parser.add_argument("--img_height",required=False,default=64,help ="height for each grapheme: default=64")
     parser.add_argument("--img_width",required=False,default=512,help ="width for each grapheme: default=512")
-    parser.add_argument("--max_glen",required=False,default=40,help=" the maximum length of grapheme data for modeling")
-    parser.add_argument("--max_clen",required=False,default=90,help=" the maximum length of components data for modeling")
-    parser.add_argument("--max_ulen",required=False,default=120,help=" the maximum length of unicode data for modeling")
+    parser.add_argument("--max_glen",required=False,default=20,help=" the maximum length of grapheme data for modeling")
+    parser.add_argument("--max_ulen",required=False,default=80,help=" the maximum length of unicode data for modeling")
     
     
     args = parser.parse_args()

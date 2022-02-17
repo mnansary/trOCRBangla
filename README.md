@@ -37,3 +37,4 @@ Gnome       : 3.36.8
 # TODO
 - [ ] synthetic storing: store.py
 - [ ] datagen.py and processing.py for natural datasets
+- [ ] processing --> image processing (mask,stds etc)

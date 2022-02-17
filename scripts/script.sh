@@ -30,17 +30,17 @@ batch_sample="1000000"
 mid_sample="200000"
 short_sample="50000"
 #-----------------------------------synthetic------------------------------------------
-python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbns" --num_samples $batch_sample --scene True --exclude_punct True
-python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbnps" --num_samples $short_sample --scene True --exclude_punct False
-python synth.py $src_dir "english" "printed" $ds_path --iden "sens" --num_samples $mid_sample --scene True --exclude_punct True
-python synth.py $src_dir "english" "printed" $ds_path --iden "senps" --num_samples $short_sample --scene True --exclude_punct False
+# python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbns" --num_samples $batch_sample --scene True --exclude_punct True
+# python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbnps" --num_samples $short_sample --scene True --exclude_punct False
+# python synth.py $src_dir "english" "printed" $ds_path --iden "sens" --num_samples $mid_sample --scene True --exclude_punct True
+# python synth.py $src_dir "english" "printed" $ds_path --iden "senps" --num_samples $short_sample --scene True --exclude_punct False
 
-python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbn" --num_samples $batch_sample --scene False --exclude_punct True
-python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbnp" --num_samples $short_sample --scene False --exclude_punct False
-python synth.py $src_dir "english" "printed" $ds_path --iden "sen" --num_samples $mid_sample --scene False --exclude_punct True
-python synth.py $src_dir "english" "printed" $ds_path --iden "senp" --num_samples $short_sample --scene False --exclude_punct False
+# python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbn" --num_samples $batch_sample --scene False --exclude_punct True
+# python synth.py $src_dir "bangla" "printed" $ds_path --iden "sbnp" --num_samples $short_sample --scene False --exclude_punct False
+# python synth.py $src_dir "english" "printed" $ds_path --iden "sen" --num_samples $mid_sample --scene False --exclude_punct True
+# python synth.py $src_dir "english" "printed" $ds_path --iden "senp" --num_samples $short_sample --scene False --exclude_punct False
 
-python synth.py $src_dir "bangla" "handwritten" $ds_path --iden "sbnh" --num_samples $batch_sample 
+# python synth.py $src_dir "bangla" "handwritten" $ds_path --iden "sbnh" --num_samples $batch_sample 
 
 #-----------------------------------synthetic------------------------------------------
 

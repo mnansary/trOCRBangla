@@ -5,20 +5,32 @@
 #--------------------
 # imports
 #--------------------
+import sys, os
 import random
 import pandas as pd 
 import cv2
 import math
 from tqdm import tqdm
 from .utils import *
+from indicparser import graphemeParser
+from bnunicodenormalizer import Normalizer
 tqdm.pandas()
-#--------------------
-# helpers
-#--------------------
+
 #--------------------
 # helpers
 #--------------------
 not_found=[]
+norm=Normalizer(use_english=True)
+
+
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
 
 def reset(df):
     # sort df
@@ -30,6 +42,7 @@ def cvt_str(x):
     try:
         x=str(x)
         x=x.strip()
+        x=norm(x)
         x=x.replace(" ","")
         return x
     except Exception as e:
@@ -149,27 +162,23 @@ def processLabels(df,vocab):
         processLabels:
         * divides: word to - unicodes,components,graphemes
     '''
-    GP=GraphemeParser(language=None)
+    GP=graphemeParser("bangla")
     # process text
     df.word=df.word.progress_apply(lambda x:cvt_str(x))
     df=reset(df)
     # unicodes
-    df["u"]=df.word.progress_apply(lambda x:[i for i in x])
+    df["unicodes"]=df.word.progress_apply(lambda x:[i for i in x])
     df=reset(df)
-    df["ulabel"]=df["u"].progress_apply(lambda x:encode_label(x,vocab.unicodes.all,vocab.unicodes.mlen))
-    df=reset(df)
-    
-    # components
-    df["c"]=df.word.progress_apply(lambda x:GP.process(x,return_graphemes=False))
-    df=reset(df)
-    df["clabel"]=df["c"].progress_apply(lambda x:encode_label(x,vocab.components.all,vocab.components.mlen))
+    df["ulabel"]=df["unicodes"].progress_apply(lambda x:encode_label(x,vocab.unicodes.all,vocab.unicodes.mlen))
     df=reset(df)
     
     # graphemes
-    df["g"]=df.word.progress_apply(lambda x:GP.process(x,return_graphemes=True))
+    df["graphemes"]=df.word.progress_apply(lambda x:GP.process(x))
     df=reset(df)
-    df["glabel"]=df["g"].progress_apply(lambda x:encode_label(x,vocab.graphemes.all,vocab.graphemes.mlen))
+    df["glabel"]=df["graphemes"].progress_apply(lambda x:encode_label(x,vocab.graphemes.all,vocab.graphemes.mlen))
     df=reset(df)
+    # columns
+    df=df[["filepath","word","unicodes","graphemes","ulabel","glabel"]]
     return df 
 
 # #---------------------------------------------------------------
